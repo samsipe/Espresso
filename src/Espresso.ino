@@ -1,88 +1,121 @@
 /*
- * Project Espresso
+ * Project: Espresso
  * Description: Control Espresso Machine from HomeBridge and Apple HomeKit
- * Author: Sam Sipe 
+ * Author: Sam Sipe
  * Date: 01 Aug 19
  */
 
 // Includes
+#include "Particle.h"
+#include "OneWire.h"
+#include "spark-dallas-temperature.h"
+#include "pid.h"
 
-// Inits 
-int relay1 = D0; // Power Relay
-int relay2 = D1; // Boiler Relay
-int tempSensor = A0; // This is where your tempSensor is plugged in. The other side goes to the "power" pin (below).
-int power = A5; // This is the other end of your tempSensor. The other side is plugged into the "tempSensor" pin (above).
-int tempValue; // Here we are declaring the integer variable analogvalue, which we will use later to store the value of the tempSensor.
-int dump;
-int count;
+// Inits
+int powerRelay = D0; // Power Relay
+int boilerRelay = D1; // Boiler Relay
 
-//Setup
+OneWire oneWire(D2); // Setup a oneWire instance to communicate with any OneWire devices (not just Maxim/Dallas temperature ICs)
+DallasTemperature dallas(&oneWire); // Pass oneWire reference to Dallas Temperature.
+double caseTemp; // Here we are declaring the integer variable analogvalue, which we will use later to store the value of the tempSensor.
+double groupTemp; // Temperature of the Espresso Machine's group head
+double tempLoop; // For temp change detection
+int timeLoop = Time.local();
+int timeOn = Time.local(); // For tracking how long the machine has been on
+
+// Setup
 void setup()
 {
     // Pin Configs
-    pinMode(relay1, OUTPUT);
-    pinMode(relay2, OUTPUT);
-    pinMode(tempSensor,INPUT);  // Our tempSensor pin is input (reading the tempSensor)
-    pinMode(power,OUTPUT); // The pin powering the tempSensor is output (sending out consistent power)
-    
-    // Pin States on Startup
-    digitalWrite(power,HIGH);
-    digitalWrite(relay1, LOW);
-    digitalWrite(relay2, LOW);
+    pinMode(powerRelay, OUTPUT);
+    pinMode(boilerRelay, OUTPUT);
 
-    // Particle.functions
-    Particle.function("espresso",espressoToggle);
-    Particle.function("boiler",boilerToggle);
-   
-    // Particle.variables
-    Particle.variable("temperature", tempValue);
+    // Pin States on Startup
+    digitalWrite(powerRelay, LOW);
+    digitalWrite(boilerRelay, LOW);
+
+    // Particle Functions //
+    Particle.function("espresso", espressoPower);
+    // Particle.function("boiler", boilerToggle);
+
+    // Particle Variables //
+    Particle.variable("groupTemp", groupTemp);
+    Particle.variable("caseTemp", caseTemp);
+
+    // setup the library
+    dallas.begin();
+    Particle.publish("Temp Sensors Found", String(dallas.getDeviceCount()), PRIVATE);
+
 }
 
-//Loop
+// Loop
 void loop()
 {
-//     tempValue = analogRead(tempSensor);
-//     tempValue = map(tempValue, 0 , 2600, 0, 100);
+    dallas.requestTemperatures();   // Request temperatures
+    groupTemp = dallas.getTempCByIndex(1);  // get the temperature of the Espresso Machine's group head
 
-//    if (count >=5000)
-//    {
-//        if (digitalRead(relay1) == HIGH)
-//        {
-//         Particle.publish("temperature", String(tempValue), PUBLIC);
-//         count=0;
-//         dump=tempValue;
-//        }
-//    }
-//     count=count+1;
+    if (Time.local() - timeLoop >= 10)
+    {
+        caseTemp = dallas.getTempCByIndex(0);  // get the temperature of the Espresso Machine Case
+
+        if (digitalRead(powerRelay) == HIGH && abs(caseTemp - tempLoop) > 1/16)
+        {
+            Particle.publish("Temperature", String::format("%.1f", caseTemp), PRIVATE);
+            tempLoop = caseTemp;
+        }
+
+        timeLoop = Time.local();
+    }
+
+    if ( (Time.local() - timeOn >= 14400) && (digitalRead(powerRelay) == HIGH) ) // 4 hours shutoff
+    {
+        timeOn = Time.local();
+        digitalWrite(boilerRelay, LOW);
+    }
+
+    /* Request time synchronization from the Particle Cloud */
+    if (Time.local() == 14000)
+    {
+        Particle.syncTime();    // Request time synchronization from the Particle Device Cloud
+        waitUntil(Particle.syncTimeDone); // Wait until the device receives time from Particle Device Cloud (or connection to Particle Device Cloud is lost)
+        Log.info("Current time: %s", Time.timeStr().c_str()); // Print current time
+        delay(1000);
+    }
 }
 
 //Functions
-int espressoToggle(String command) 
+int espressoPower(String command)
 {
-    if (command=="1") 
+    if (command == "1")
     {
-        digitalWrite(relay1,HIGH);
+        digitalWrite(powerRelay, HIGH);
+        delay(500);
+        digitalWrite(boilerRelay, HIGH);
+        timeOn = Time.local();
         Particle.publish("Espresso", "ON", PRIVATE);
         return 1;
     }
-    else if (command=="0") 
+    else if (command == "0")
     {
-        digitalWrite(relay2,LOW);
-        Particle.publish("Boiler", "OFF", PRIVATE);
+        digitalWrite(boilerRelay, LOW);
+        // Particle.publish("Boiler", "OFF", PRIVATE);
         delay(500);
-        digitalWrite(relay1,LOW);
+        digitalWrite(powerRelay, LOW);
         Particle.publish("Espresso", "OFF", PRIVATE);
         return 0;
     }
-    else if (command=="?") 
+    else if (command == "?")
     {
-        if (digitalRead(relay1) == HIGH)
+        if (digitalRead(powerRelay) == HIGH)
         {
+            digitalWrite(boilerRelay, HIGH);
+            timeOn = Time.local();
             Particle.publish("Espresso", "ON", PRIVATE);
             return 1;
         }
-        else if (digitalRead(relay1) == LOW)
+        else if (digitalRead(powerRelay) == LOW)
         {
+            digitalWrite(boilerRelay, LOW);
             Particle.publish("Espresso", "OFF", PRIVATE);
             return 0;
         }
@@ -91,59 +124,58 @@ int espressoToggle(String command)
             return -1;
         }
     }
-    else 
+    else
     {
         return -1;
     }
 }
 
-int boilerToggle(String command) 
-{
-    if (command=="1") 
-    {
-        // if (digitalRead(relay1) == HIGH)
-        // {
-                digitalWrite(relay2,HIGH);
-                Particle.publish("Boiler", "ON", PRIVATE);
-                return 1;
-        // }
-        // else if (digitalRead(relay1) == LOW)
-        // {
-        //     digitalWrite(relay2,LOW);
-        //     Particle.publish("Boiler", "OFF", PRIVATE);
-        //     return 0;
-        // }
-        // else
-        // {
-        //     return -1;
-        // }
-        
-    }
-    else if (command=="0") 
-    {
-        digitalWrite(relay2,LOW);
-        Particle.publish("Boiler", "OFF", PRIVATE);
-        return 0;
-    }
-    else if (command=="?") 
-    {
-        if (digitalRead(relay2) == HIGH)
-        {
-            Particle.publish("Boiler", "ON", PRIVATE);
-            return 1;
-        }
-        else if (digitalRead(relay2) == LOW)
-        {
-            Particle.publish("Boiler", "OFF", PRIVATE);
-            return 0;
-        }
-        else
-        {
-            return -1;
-        }
-    }
-    else 
-    {
-        return -1;
-    }
-}
+// int boilerToggle(String command)
+// {
+//     if (command=="1")
+//     {
+//         // if (digitalRead(powerRelay) == HIGH)
+//         // {
+//                 digitalWrite(boilerRelay,HIGH);
+//                 Particle.publish("Boiler", "ON", PRIVATE);
+//                 return 1;
+//         // }
+//         // else if (digitalRead(powerRelay) == LOW)
+//         // {
+//         //     digitalWrite(boilerRelay,LOW);
+//         //     Particle.publish("Boiler", "OFF", PRIVATE);
+//         //     return 0;
+//         // }
+//         // else
+//         // {
+//         //     return -1;
+//         // }
+//     }
+//     else if (command=="0")
+//     {
+//         digitalWrite(boilerRelay,LOW);
+//         Particle.publish("Boiler", "OFF", PRIVATE);
+//         return 0;
+//     }
+//     else if (command=="?")
+//     {
+//         if (digitalRead(boilerRelay) == HIGH)
+//         {
+//             Particle.publish("Boiler", "ON", PRIVATE);
+//             return 1;
+//         }
+//         else if (digitalRead(boilerRelay) == LOW)
+//         {
+//             Particle.publish("Boiler", "OFF", PRIVATE);
+//             return 0;
+//         }
+//         else
+//         {
+//             return -1;
+//         }
+//     }
+//     else
+//     {
+//         return -1;
+//     }
+// }
