@@ -2,7 +2,7 @@
 
 A Particle Photon setup to control a Promac Espresso Machine. 
 
-## Welcome to your project!
+## Welcome to your project! 
 
 Every new Particle project is composed of 3 important elements that you'll see have been created in your project directory for Espresso.
 

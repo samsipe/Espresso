@@ -44,7 +44,8 @@ void setup()
 
     // setup the library
     dallas.begin();
-    Particle.publish("Temp Sensors Found", String(dallas.getDeviceCount()), PRIVATE);
+    int deviceCount = dallas.getDeviceCount();
+    Particle.publish("Temp Sensors Found", String(deviceCount), PRIVATE);
 
 }
 
@@ -52,17 +53,17 @@ void setup()
 void loop()
 {
     dallas.requestTemperatures();   // Request temperatures
-    groupTemp = dallas.getTempCByIndex(1);  // get the temperature of the Espresso Machine's group head
+    groupTemp = dallas.getTempCByIndex(0);  // get the temperature of the Espresso Machine's group head
 
     if (Time.local() - timeLoop >= 10)
     {
-        caseTemp = dallas.getTempCByIndex(0);  // get the temperature of the Espresso Machine Case
+        caseTemp = dallas.getTempCByIndex(1);  // get the temperature of the Espresso Machine Case
 
-        if (digitalRead(powerRelay) == HIGH && abs(caseTemp - tempLoop) > 1/16)
+        do 
         {
             Particle.publish("Temperature", String::format("%.1f", caseTemp), PRIVATE);
             tempLoop = caseTemp;
-        }
+        } while (digitalRead(powerRelay) == HIGH && abs(caseTemp - tempLoop) > 1/16);
 
         timeLoop = Time.local();
     }
