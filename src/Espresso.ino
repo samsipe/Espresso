@@ -12,6 +12,8 @@
 #include "spark-dallas-temperature.h"
 #include "pid.h"
 
+STARTUP(WiFi.selectAntenna(ANT_EXTERNAL)); // selects the external u.FL antenna
+
 SYSTEM_MODE(SEMI_AUTOMATIC);
 SYSTEM_THREAD(ENABLED);
 

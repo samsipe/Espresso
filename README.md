@@ -15,6 +15,7 @@ The code also allows for automatic shutoff, in case the espresso machine is left
 ## Bill of Materials
 
 - 1x [Particle Photon](https://store.particle.io/) (new Photon 2 doesn't work with the temp sensors)
+- 1x [Particle 2.4GHz Antenna](https://store.particle.io/collections/wifi/products/wi-fi-or-mesh-2-4ghz-antenna)
 - 2x [SSR-40 DA Solid State Relays](https://www.sparkfun.com/products/13015)
 - 2x [High Temp Waterproof DS18B20 Digital Temperature Sensors ](https://www.adafruit.com/product/642)
 - Wires and a power supply
