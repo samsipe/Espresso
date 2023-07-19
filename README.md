@@ -12,6 +12,13 @@ The code also allows for automatic shutoff, in case the espresso machine is left
 
 [Here is an image](images/photon_and_relays.jpeg) of the Photon and the relays, and [an image of how it is wired](images/ac_wiring.jpeg) into the espresso machine.
 
+## Bill of Materials
+
+- 1x [Particle Photon](https://store.particle.io/) (new Photon 2 doesn't work with the temp sensors)
+- 2x [SSR-40 DA Solid State Relays](https://www.sparkfun.com/products/13015)
+- 2x [High Temp Waterproof DS18B20 Digital Temperature Sensors ](https://www.adafruit.com/product/642)
+- Wires and a power supply
+
 ## To-Do
 
 While my espresso machine doesn't need a PID (since it's a heat exchanger) having more control over the group head brew temperature would be useful. I plan to add a PID on the boiler temperature and a way to set it remotely via particle.
